@@ -1,50 +1,47 @@
-##Title: Floral mimicry induces sympatric speciation in a South American cactus 
-##Authors: Pablo C. Guerrero, Claudia A. Antinao, Mary T. K. Arroyo, Deren Eaton, Beatriz Vergara–Meriño, Heidy Villalobos, Gastón O. Carvallo
+######## "Floral mimicry induces sympatric speciation in a South American cactus"
+######## Pablo C. Guerrero ET AL.
+######## Here, we only include scripts related to pollination niche characterization and fitness
 
-## Check packages
-packages = c("vegan", "ggplot2",
-             "png", "grid","lme4","nlstimedist", 
-             "nlstools","abind","plyr","ggridges","emmeans", "dplyr","boot")
-package.check <- lapply(
-  packages,
-  FUN = function(x) {
-    if (!require(x, character.only = TRUE)) {
-      install.packages(x, dependencies = TRUE)
-      library(x, character.only = TRUE)
-    }
-  }
-)
+citation() # Version of R used
+rm(list=ls()) # 
+setwd()
 
-##setup directory
-setwd("~/data")
 
-##MORPHOSPACE##
-##MULTIDIMENSIONAL SCALING (NMDS) 
-datos_nmds<-read.table(file="1morphospace.csv", header=T, sep=";", check.names=T, dec=".", row.names=1) 
-ord<-read.table(file="1morphospace.csv", header=T, sep=";", check.names=T, dec=".") 
+#################################
+##########MORPHOSPACE############
+#################################
+
+##Non-metric multidimensional scaling (NMDS) 
+datos_nmds<-read.table(file="1morphospace.csv", header=T, sep=";", check.names=T, dec=".", row.names=1) # 
+ord<-read.table(file="nmds_Neoporteria_morfo.csv", header=T, sep=";", check.names=T, dec=".") # 
 ordenamiento<-ord[,c(1,2)]
 attach(ordenamiento)
 
-nmds_traits<-datos_nmds[,c(3:13)] #model01
-model01<-metaMDS(nmds_traits, distance="euclidean", binary=F, k=2, zerodist="add", trymax=1000, autotransform=T,plot=F,na.rm=T) 
+library(vegan)
+
+nmds_rasgos<-datos_nmds[,c(3:13)] #model01
+model01<-metaMDS(nmds_rasgos, distance="euclidean", binary=F, k=2, zerodist="add", trymax=1000, autotransform=T,plot=F,na.rm=T) 
 model01$stress
 stressplot(model01) # Produces a Shepards diagram
 
 #Multidimensional analysis
-dist_traits<-vegdist(nmds_traits, method="euclidean", binary=F)
-adonis_traits<-adonis(dist_traits ~ Taxa, ordenamiento,method="euclidean", binary=F, diag=F, permutations=999)
-adonis_traits
+dist_rasgos<-vegdist(nmds_rasgos, method="euclidean", binary=F)
+adonis_rasgos<-adonis(dist_rasgos ~ Taxa, ordenamiento,method="euclidean", binary=F, diag=F, permutations=999)
+adonis_rasgos
 
 # NMDS Plot
 scores<-scores(model01, display="sites", shrinf=F)
 scores<-cbind(scores,ordenamiento)
 
+library(ggplot2)
+
+#colors 
 temp=c(2,2,2,2)
-barplot(temp,col=c("#189E76BF","#DA5D00BF","#736DB3BF","#E7AB00BF"), names.arg=c("chilensis", "mutabilis", "litoralis","albidiflora"))
+barplot(temp,col=c("#189E76BF","#DA5D00BF","#736DB3BF","#E7AB00BF"), names.arg=c("chilensis", "mutabilis", "litoralis","albidiflora"),main="Colors used in the manuscript")
+
 
 plot01<-ggplot(scores,aes(x = NMDS1, y = NMDS2), color=Taxa,shape=Taxa) +
   theme_gray(base_size=30)
-
 plot02<-plot01 +stat_ellipse(geom = "polygon", aes(group = Taxa, color = Taxa, fill = Taxa), 
                      alpha = 0.3,show.legend =F)+
   theme(axis.title.x = element_text(size=24),axis.title.y = element_text(size=24),
@@ -61,73 +58,77 @@ plot02<-plot01 +stat_ellipse(geom = "polygon", aes(group = Taxa, color = Taxa, f
                     labels=c("chilensis-albidiflora", "chilensis", "litoralis","mutabilis"))
 plot02
 
-##PHENOLOGY##
-# This code compute nonlinear models describing pollination niche. Niche similarity is based on the estimated variables (days de apertura, flowering span,flower50%, r, t and c)
-# Citation: Steer et al (2019) https://doi.org/10.1111/2041-210X.13293
+#################################
+##########PHENOLOGY##############
+#################################
 
+library(nlstimedist) # see https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.13293
+library(nlstools)
+
+# Non linear niche models. 
+
+# 
 phenology<-read.table(file="2fenologia.csv", header=T, sep=";", check.names=T, dec=".")
 
-# r: maximum growth rate (1/flowering time). Flowering time represents the whole period of phenology.
-# c: concentration of cases, number of cases when r becomes maximum. 
-# t: measure of the weight of the process duration [time].
 
-# Phenology_albidiflora
+##Phenology_albidiflora
 alb<-phenology[c(1:23),c(5,14)]
 dt_alb<-tdData(alb,x="dfs_corr", y="alb")
 model_alb<-timedist(dt_alb,x = "dfs_corr", y = "propMax", 
                     r = 0.011, c = 0.5, t = 42)
 attach(model_alb)
-confint2(model_alb) #confidence intervals
+confint2(model_alb) 
 tdRSS(model_alb) # pseudo-R
-tdPdfPlot(model_alb, S = 1, xVals = seq(0, 160, 0.01)) #Probability of flowering of all plants
+tdPdfPlot(model_alb, S = 1, xVals = seq(0, 160, 0.01)) #probability of flowering of all plants
 tdCdfPlot(model_alb, S = 1, xVals = seq(0, 160, 0.01))
 
-# Phenology_chilensis
+##Phenology_chilensis
 chi<-phenology[c(1:23),c(5,8)]
 chi
 dt_chi<-tdData(chi,x="dfs_corr", y="chi_Molles")
 model_chi<-timedist(dt_chi,x = "dfs_corr", y = "propMax", 
                     r = 0.0119, c = 0.5, t = 42)
-confint2(model_chi) #confidence intervals
+confint2(model_chi) 
 tdRSS(model_chi) # pseudo-R
 tdPdfPlot(model_chi, S = 1, xVals = seq(0, 160, 0.01))
 tdCdfPlot(model_chi, S = 1, xVals = seq(0, 160, 0.01))
 
-# Phenology_litoralis (includes Pichidangui and Chivato, named "Pichidangui")
+##Phenology_litoralis
 litPich<-phenology[c(1:23),c(5,15)]
 dt_litPich<-tdData(litPich,x="dfs_corr", y="lit")
 model_litPich<-timedist(dt_litPich,x = "dfs_corr", y = "propMax", 
                         r = 0.007, c = 0.5, t = 63)
 model_litPich
-confint2(model_litPich) #confidence intervals
+confint2(model_litPich) 
 tdRSS(model_litPich) # pseudo-R
 tdPdfPlot(model_litPich, S = 1, xVals = seq(0, 160, 0.01))
 tdCdfPlot(model_litPich, S = 1, xVals = seq(0, 160, 0.01))
 
-#Phenology_mutabilis
+##Phenology_mutabilis
 mut<-phenology[c(1:23),c(5,12)]
 dt_mut<-tdData(mut,x="dfs_corr", y="mut_Qchiv")
 model_mut<-timedist(dt_mut,x = "dfs_corr", y = "propMax", 
                     r = 0.0243, c = 0.0155, t = 20.5)
-confint2(model_mut,n = c(0.05,0.95)) #confidence intervals
+confint2(model_mut,n = c(0.05,0.95))
 tdRSS(model_mut) # pseudo-R
 tdPdfPlot(model_mut, S = 1, xVals = seq(0, 160, 0.01))
 tdCdfPlot(model_mut, S = 1, xVals = seq(0, 160, 0.01))
 
-# All models polot
+##plot
 tdPdfPlot(model_alb, model_chi,model_litPich,model_mut, 
           S = c(0.9, 0.9, 0.9,0.9),
           xVals = seq(-20, 180, 0.1))
 tdCdfPlot(model_alb,model_chi,model_litPich,model_mut, 
           S = c(0.9, 0.9, 0.9,0.9),xVals = seq(0, 180, 0.1))#,yVals=seq(0,1,1))
 
-## Edited Plot_phenology (95% confidence intervals)
-##parameters
+#### Edited Plot_phenology (95% CONF INTERVALS)
+library(ggplot2)
+##Parameters
 dt_alb$pred<-predict(model_alb) 
 dt_mut$pred<-predict(model_mut)
 dt_chi$pred<-predict(model_chi)
 dt_litPich$pred<-predict(model_litPich)
-# estandard error 
+#standard errors
 se_alb = summary(model_alb)$sigma
 se_mut = summary(model_mut)$sigma
 se_chi = summary(model_chi)$sigma
@@ -141,8 +142,9 @@ ci_lit = outer(dt_litPich$pred, c(outer(se_lit, c(-1,1), '*'))*1.96, '+')
 # x and f are the values of dfs_corr and propMax from "dt_spX"
 data_fgy<-read.table(file="3fenologia_plot.csv", header=T, sep=";", check.names=T, dec=".")
 
+library(ggplot2)
 plot.new()
-
+# to visualize dots add geom_point(shape=19, size=5)
 plot04<-ggplot(data_fgy, aes(x=x, y=f, color=taxa, shape=taxa)) +
   ylab("Proportion of \n flowering plants") + 
   xlab("Days") +
@@ -153,7 +155,7 @@ plot04<-ggplot(data_fgy, aes(x=x, y=f, color=taxa, shape=taxa)) +
            label= c("Jul","Aug","Sep","Oct","Nov"),size=9,hjust=0)+
   theme_gray(base_size=30)
 
-#with confidence intervals
+#IC
 plot05<-plot04 + geom_line(aes(x=x,y=pred,colour=taxa),size=1.5) +
   geom_ribbon(aes(ymax=upr.conf, ymin=lwr.conf, fill=taxa), 
               alpha = 0.3,show.legend =F )+
@@ -172,54 +174,60 @@ plot05<-plot04 + geom_line(aes(x=x,y=pred,colour=taxa),size=1.5) +
                     labels=c("chilensis-albidiflora", "chilensis", "litoralis","mutabilis"))
 plot05
 
-##
-##POLLINATORS##
-##
+#################################
+##########POLLINATORS############
+#################################
 
-#data_including_functionalgroups
-SLPat<-read.table(file="4pollinatorsGF.csv", header=T, sep=";", check.names=T, dec=".") # para los datos incluir el row.names (no para el factor de ordenamiento)
+#data_including_functional_pollinators_groups
+SLPat<-read.table(file="4pollinatorsGF.csv", header=T, sep=";", check.names=T, dec=".")
+names(SLPat)
+SLPat$visitas
 
-modelo_polinizadoresGF<-glmer(visitas~taxa+gf+(1|ID.1), family=poisson(), data=SLPat,
+library(lme4)
+modelo_polinizadoresGF<-glmer(tv~taxa+gf+(1|ID.1), family=poisson(), data=SLPat,
                   control=glmerControl(optimizer="bobyqa"),nAGQ=3 ) #To avoid a warning of nonconvergence, we specify a different optimizer with the argument control=glmerControl(optimizer="bobyqa"). Although the model will produce nearly identical results without the new argument, we prefer to use models without such warnings.https://stats.idre.ucla.edu/r/dae/mixed-effects-logistic-regression/
+modelo_polinizadoresGF
 summary(modelo_polinizadoresGF)
 drop1(modelo_polinizadoresGF, test="Chi")
 
 # Model_pollinatordGF_Plot
 myData<- aggregate(SLPat$tv,by = list(taxa = SLPat$taxa, gf = SLPat$gf),
                    FUN = function(x) c(mean = mean(x), sd = sd(x),
-                                       n = length(x))) #genera la estad?stica descriptiva que va al gr?fico
+                                       n = length(x)))
 myData <- do.call(data.frame, myData)
-myData$se <- myData$x.sd / sqrt(myData$x.n) # error estandard
+myData$se <- myData$x.sd / sqrt(myData$x.n) #standard errors
 colnames(myData) <- c("taxa", "gf", "mean", "sd", "n", "se")
 
+library(ggplot2)
 dodge <- position_dodge(width = 0.9)
 limits <- aes(ymax = mean + se,
               ymin = mean - se)
 
 plot06 <- ggplot(data = myData, aes(x = gf, y = mean, fill = taxa))+
-  geom_hline(yintercept = c(0,1,2))+labs(y=expression(Visits%.%hour^{-1}),size=18)+
+  geom_hline(yintercept = c(0,1,2))+
+  labs(y=expression(Visits%.%hour^{-1}),size=32)+
   theme_gray(base_size=30)
 plot07<-plot06 + geom_bar(stat = "identity", position = dodge) +
   geom_errorbar(limits, position = dodge, width = 0.4,lwd=1) +
-  theme(axis.text.x=element_text(size=15), 
+  theme(axis.text.x=element_text(size=28), 
         axis.ticks.x=element_blank(),
-        axis.text.y=element_text(size=12),
+        axis.text.y=element_text(size=28),
         axis.title.x=element_blank(),
-        axis.title.y=element_text(size=20,margin=unit(c(0,2,0,0),"mm")),
+        axis.title.y=element_text(size=32,margin=unit(c(0,2,0,0),"mm")),
         panel.border=element_rect(colour = "black", fill=NA, size=3.5),
-        legend.position="none",
+        legend.position="right",
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),legend.title = element_blank(),
-        legend.text=element_text(size=22),
-        plot.background = element_rect(fill = "gray93"))+
+        legend.text=element_text(size=22))+
   scale_fill_manual(values = c("#E7AB00BF","#189E76BF","#736DB3BF","#DA5D00BF"),
                     labels=c("chilensis-albidiflora", "chilensis", "litoralis","mutabilis"))+
-  scale_x_discrete(limits=c("small","large","patagona"), labels=c("Small bees","Large bees","Patagona gigas"))+
+  scale_x_discrete(limits=c("small","large","patagonas"), labels=c("Small bees","Large bees","Patagona gigas"))+
   scale_y_continuous(expand = c(0, 0),limits = c(0, 2.5))
 
+#plot.background = element_rect(fill = "gray93")
 plot07  
 
-#Stacked pollinators plot
+#Stacked pollinators plot1
 df_stack_pol<-data.frame(
   pol=rep(c("Lip (s)","Ant (s)","Humm",	"Dli1 (s)",	"Chi1 (s)",	"Tri (l)",	"Chi2 (s)",
             "Other bees"),4),
@@ -246,32 +254,77 @@ plot09<-plot08 + theme(axis.title.x = element_text(size=24,margin=unit(c(4,7,7,0
   scale_y_continuous(expand = c(0, 0),limits = c(0, 0.45))+
   coord_flip()
 
+
+#Stacked pollinators plot2
+detach(package:plyr)
+library(dplyr)
+names(SLPat)
+df.cacti_pol <- SLPat %>%
+  group_by(taxa,gf) %>%
+  summarise(
+    sd = sd(visitas, na.rm = TRUE),
+    visitas = sum(visitas)
+  )
+df.cacti_pol
+
+df_stack_cacti<-data.frame(
+  cacti=rep(c("albidiflora","chilensis","litoralis","mutabilis"),each=3),
+  taxa=rep(c("Small bees","Large bees","Patagona gigas"),each=1),
+  visits=c(125/322,4/322,0/322,102/311,4/311,0/311,12/316,0/316,52/316,183/183,20/183,0))
+df_stack_cacti
+names(df_stack_cacti)
+
+library(RColorBrewer)
+
+plot08 <- ggplot(df_stack_cacti, aes(x = (cacti), y = visits))+
+  geom_col(aes(fill =taxa), width = 0.9)+
+  ylab("Number of visits per hour")+
+  theme_gray(base_size=30)
+plot08
+plot09<-plot08 + theme(axis.title.x = element_blank(),
+                       axis.title.y = element_text(size=24,
+                                                   margin=unit(c(4,7,7,0),"mm")),
+                       axis.text=element_text(size=20), 
+                       panel.border=element_rect(colour = "black", 
+                                                 fill=NA, size=3),
+                       legend.position="right", 
+                      panel.grid.major = element_blank(),
+                       panel.grid.minor = element_blank(),
+                      legend.title = element_blank(),
+                       legend.text=element_text(size=18))+
+  scale_fill_manual(values = c("tan4","tan2","tan"),
+                    labels=c("Large bees", "Patagona gigas", "Small bees"))+
+  scale_x_discrete(labels=expression(italic(albidiflora),italic(chilensis),
+                                     italic(litoralis),italic(mutabilis)))+
+  scale_y_continuous(expand = c(0, 0),limits = c(0, 1.2))
+
+
 plot09
 
+###################################################
+###########MULTIDIMENSIONAL NICHE##################
+##################################################
 
-##
-###MULTIDIMENSIONAL NICHE##
-###
+# This script is adapted from Geange et al (2010) Methods in Ecology and Evolution https://doi.org/10.1111/j.2041-210X.2010.00070.x
 
-# Modified codes from Geange et al (2010) Methods in Ecology and Evolution https://doi.org/10.1111/j.2041-210X.2010.00070.x
-##A unified analysis of niche overlap incorporating data of different types
-# A Program to calculate niche overlaps over multiple niche axes per individual.
-
-##First of all, you need to load functions used in this script
-# Required package abind
+####First of all, you need to load functions used in this script
+# Required packages
+library(abind)
 # Read in the niche overlap functions:
 source("Geange_et_al_2010_niche_functions.txt")
 
-###   
+#############################################################   
 # -----------------------------------------------------------
 #          Analysis B: POLLINATORS
 # -----------------------------------------------------------
-### 
+############################################################# 
 
 # Analysis for calculating niche overlap on a single niche axis,
 # in this instance a categorical variable.
-B.df <- read.table("5polinizadores_NMD.txt",T)
-#list.files()
+dir()
+B.df <- read.table("5pollinatorsGF.txt",T) # 
+B.df
+
 # Ensure the first two column names are "id" and "species".
 colnames(B.df)[1] <- "id"
 colnames(B.df)[2] <- "species"
@@ -285,12 +338,14 @@ varnames <- colnames(B.df)[-(1:2)]
 no.vars  <- length(varnames) 
 
 # Make a vector of variable types to match the variable names:
+# ?????????????????????????????????????????????????????????? 
 vartypes <- c("cat")
+# ?????????????????????????????????????????????????????????? 
 
 # Check they are correctly labelled:
 cbind(varnames,vartypes)
-avail.list <- vector("list",no.vars) ###
-names(avail.list) <- varnames ###
+avail.list <- vector("list",no.vars) #########
+names(avail.list) <- varnames #########
 
 # Set up R objects to store results
 # alpha.list
@@ -350,12 +405,24 @@ for (vv in 1:no.vars)
   }
 }
 
+
 # Analysis B  -  Permutation testing.
 # -----------------------------------
-# Permutation of the species niches.
+# Permutation of the species labels would give data 
+# satisfying the null model of complete niche overlap, 
+# i.e. that none of the variables 
+# serves to differentiate species into different niches.
 
-replic<-999
-Bpseudo.no.array  <- array(1,c(no.spp,no.spp,no.vars,replic)) #remplace replic por el n?mero
+# Hence for each replication, permute the species labels
+# and run through all the calculations above.
+# Store NOs in an array with one extra dimension, one
+# layer for each replication.
+# Then the null distributions are all stored.
+# Can use the original availability data, but need a new 
+# alpha list each time.
+
+replic<-100000
+Bpseudo.no.array  <- array(1,c(no.spp,no.spp,no.vars,replic)) 
 dimnames(Bpseudo.no.array) <- list(spnames,spnames,varnames,NULL)
 
 # Set a temporary data frame, which will change each time
@@ -406,14 +473,14 @@ for (rr in 1:replic)
   print(paste("Rep",rr,"done"))
 }
 
-Bpseudo.no.array
-apply(Bpseudo.no.array,c(1,2),function(x) sd(as.vector(x))) #SD estimation from the array
+Bno.array
+apply(Bpseudo.no.array,c(1,2),function(x) mean(as.vector(x))) #SD estimation from the array
 
-###     
+#############################################################     
 # -----------------------------------------------------------
 #          Analysis C: TRAITS (MORPHOSPACE)
 # -----------------------------------------------------------
-### 
+############################################################# 
 
 # Analysis for calculating niche overlap on a single niche axis,
 # in this instance a measurement variable.
@@ -442,7 +509,9 @@ varnames <- colnames(C.df)[-(1:2)]
 no.vars  <- length(varnames) 
 
 # Make a vector of variable types to match the variable names:
+# ?????????????????????????????????????????????????????????? 
 vartypes <- c("cts")
+# ?????????????????????????????????????????????????????????? 
 # Check they are correctly labelled:
 cbind(varnames,vartypes)
 
@@ -453,6 +522,7 @@ avail.list <- vector("list",no.vars)
 names(avail.list) <- varnames
 
 # Set up R objects to store results
+
 # alpha.list
 # The object alpha.list has one component per variable.
 # The components are NULL for ordinary variables.
@@ -581,12 +651,14 @@ for (rr in 1:replic)
 }
 
 Cno.array
-apply(Cpseudo.no.array,c(1,2),function(x) sd(as.vector(x))) # SD estimation from array
+apply(Cpseudo.no.array,c(1,2),function(x) mean(as.vector(x))) # SD estimation from array
+apply(Bpseudo.no.array,c(1,2),function(x) mean(as.vector(x))) # SD estimation from array
 
-##-----------------------------------------------------------
+
+##########################################################
 #          Analysis A: PHENOLOGY
 # -----------------------------------------------------------
-### 
+############################################################# 
 
 # Analysis for calculating niche overlap on a single niche axis,
 # in this instance a continuous variable.
@@ -616,7 +688,9 @@ varnames <- colnames(A.df)[-(1:2)]
 no.vars  <- length(varnames) 
 
 # Make a vector of variable types to match the variable names:
+# ??????????????????????????????????????????????????????????
 vartypes <- c("cts")
+# ??????????????????????????????????????????????????????????
 # Check they are correctly labelled:
 cbind(varnames,vartypes) #das mean "day after solstice"
 
@@ -690,7 +764,10 @@ for (vv in 1:no.vars)
 
 # Analysis A  -  Permutation testing.
 # -----------------------------------
-# Permutation of the species niches.
+# Permutation of the species labels would give data 
+# satisfying the null model of complete niche overlap, 
+# i.e. that none of the variables 
+# serves to differentiate species into different niches.
 
 # Set up array to store pseudo niche overlaps:
 Apseudo.no.array  <- array(1,c(no.spp,no.spp,no.vars,replic))
@@ -748,18 +825,20 @@ for (rr in 1:replic)
 Ano.array
 apply(Apseudo.no.array,c(1,2),function(x) sd(as.vector(x))) #SD estimation from the array
 
-###   
+
+#############################################################   
 # -----------------------------------------------------------
 # Combine the three axes into a single dataframe and 
 #  calculate mean niche overlap across axes
-# en nuestro caso RASGOS, POLINIZADORES Y FENOLOG?A
+# MORPHOSPHACE, POLLINATORS AND PHENOLOGY (present study)
 # ----------------------------------------------------------- 
-### 
+############################################################# 
 
-# Combine the three axes (habitat, position and pfar) into a single dataframe   
-#A. Phenology==> type="cts"
-#B. Pollinators==> type="cat"
-#C. Traits==> type="cts"
+# Combine the three axes (habitat, position and pfar) into a
+# single dataframe   
+#A. FENOLOGIA==> type="cat"
+#B. POLINIZADORES==> type="cat"
+#C. RASGOS==> type="cts"
 # Follow the same order used in individual axis characterization
 no.all.mat <- abind(Bno.array,Cno.array,Ano.array,along=3) 
 
@@ -768,27 +847,32 @@ mean_overlap <- apply(no.all.mat,1:2,mean)
 # calculate the associated standard deviation
 sd_overlap <- apply(no.all.mat,1:2,sd)
 
-# Combine the three pseudo datasets (habitat, position and pfar) into a single dataframe   
+# Combine the three pseudo datasets (habitat, position and pfar) 
+# into a single dataframe   
+# ACA SE DEBE INCORPORAR MATRICES A USAR
 pseudo.no.all.mat <- abind(Bpseudo.no.array,Cpseudo.no.array,Apseudo.no.array,along=3) 
 
 # For each replicate, calculate mean niche overlap across axes 
 pseudo.mean_overlap <- apply(pseudo.no.all.mat,c(1:2,4),mean)
 pseudo.mean_overlap
 
-###
+#############################################################
 #--------------------------------------------------------
 # Null model analysis determining if the niches
 # of two species in niche space differ
 #--------------------------------------------------------
-###
+#############################################################
+
 # Calculate p values for each pair of species 
 # separately for each variable.
 
 # calculate number of axes
 no.axes <- dim(no.all.mat)[3]
 
+#????????????????????????????????????????????????????????
 # assign name to each axis
-axis.names <- c("Pollinators","Traits", "Phenology") 
+axis.names <- c("polinizadores","rasgos", "fenologia") # "fenologia"
+#????????????????????????????????????????????????????????
 
 # calculate seperate p-values for each axis
 sep.pvals     <- array(1,c(no.spp,no.spp,no.axes))
@@ -803,6 +887,7 @@ for (spa in 1:(no.spp-1)) for (spb in (spa+1):no.spp)
     length(pseudo.nos[data.no<pseudo.nos])
     sep.pvals[spb,spa,vv] <- sep.pvals[spa,spb,vv] 
   }
+
 
 # Also calculate a p-value for overall NO measure averaged across axes
 overall.pvals <- matrix(1,no.spp,no.spp)
@@ -819,11 +904,14 @@ for (spa in 1:(no.spp-1)) for (spb in (spa+1):no.spp)
   overall.pvals[spb,spa] <- overall.pvals[spa,spb] 
 }
 
+
+#############################################################
 #--------------------------------------------------------
 # Null model analysis determining if the distribution of
 # species across niche space are more differentiated
 # or more clustered than expected
 #--------------------------------------------------------
+#############################################################
 
 # First, reformat the observed data to derive a matrix of niche overlaps
 # with one row per species combination, and one column for each niche dimension
@@ -834,6 +922,7 @@ RR <- replic   # Number of replications.
 no.mat <- matrix(NA,(no.spp*(no.spp-1)/2),VV)
 for (vv in 1:VV)
   no.mat[,vv] <- as.vector(as.dist(no.all.mat[,,vv]))
+
 
 # Next, reformat the pseudo data to derive a matrix of niche overlaps
 # with one row per species, and one column for each niche dimension,
@@ -883,6 +972,7 @@ for (kk in 1:KK)
   p.dims.clus[kk] <- mean(data.ch[kk] < pseudo.ch[,kk])
 names(p.dims.clus) <- paste("clus.dim",sort(axis.names))
 
+
 # --------------------------------------------------------
 # For average niche overlap, calculate mean and variance over the species
 # pairs, and hence the test statistic ch = coefficient of heterogeneity.
@@ -897,11 +987,12 @@ p.all.diff <- mean(overall.data.ch > overall.pseudo.ch)
 # Test if this community is more clustered than random:
 p.all.clus <- mean(overall.data.ch < overall.pseudo.ch)
 
-###
+
+#############################################################
 #--------------------------------------------------------
 # Save all results of the analysis:
 #--------------------------------------------------------
-###
+#############################################################
 
 NOb.results <- list(
   info = list(variables = cbind(axis.names,c("cat","cts","cts")), #"resl","cat","meas"
@@ -916,6 +1007,7 @@ NOb.results <- list(
   overall.cluster.pvalues = p.all.clus,
   overall.differentiated.pvalues = p.all.diff)
 
+# ??????????????????????????????????????????????????
 # To inspect results later, type in
 #    names(NOb.results)
 # to decide what to look at. Then type (e.g.)
@@ -927,11 +1019,15 @@ NOb.results <- list(
 Eriosyce.results<-NOb.results
 Eriosyce.results
 
-###
-###REPRODUCTIVE SUCCESSS##
-###
+
+
+########################################################
+###########REPRODUCTIVE SUCCESSS########################
+########################################################
 
 RS<-read.table("8Eriosyce_RS.csv", header=T, sep=";",dec=".")
+
+library(lme4)
 
 # FRUIT_SET_MODEL
 RS$Species<-factor(RS$Species) 
@@ -942,6 +1038,10 @@ model_FS<-glm(fruit.set~Species, data=RS,family=binomial())
 drop1(model_FS,test="Chisq")
 
 #PLOT_FRUIT_set
+library(ggplot2)
+library(plyr)
+library(ggridges)
+
 mu <- ddply(RS, "Species", summarise, grp.mean=mean(fruit.set))
 head(mu)
 
@@ -968,6 +1068,7 @@ drop1(model_SN,test="Chisq")
 comparacion = emmeans(model_SN, ~ Species)
 pairs(comparacion)
 
+#el gr?fico
 plot12<-ggplot(RS, aes(x=Number.of.seeds,y=Species,fill=Species)) + 
   geom_density_ridges(alpha=0.8,scale=1,jittered_points=T,
                       position = position_points_jitter(width = 0.05, height = 0),
@@ -983,17 +1084,20 @@ plot12<-ggplot(RS, aes(x=Number.of.seeds,y=Species,fill=Species)) +
   theme_gray(base_size=30)
 plot12
 
+#####
 #GERMINATION
 germ<-read.table("9Eriosyce_germination.csv", header=T, sep=";",dec=".")
 model_germ<-glm(germination~species, data=germ, 
                 family=quasibinomial)
 drop1(model_germ,test="Chisq")
 
+library(emmeans)
 comparacion = emmeans(model_germ, ~ species)
 pairs(comparacion)
 
 # Germination_plot
 detach(package:plyr)
+library(dplyr)
 df.summary <- germ %>%
   group_by(species) %>%
   summarise(
@@ -1002,9 +1106,12 @@ df.summary <- germ %>%
   )
 df.summary
 
+library(ggplot2)
+
 ggplot(df.summary, aes(species, germination)) +
-  geom_pointrange(
-    aes(ymin = germination-sd, ymax = germination+sd,color=species))+
+  geom_errorbar(
+    aes(ymin = germination-sd, ymax = germination+sd,color=species),
+    lwd=2,width=0.2)+
   geom_point(aes(color=species),
              position=position_dodge(0.7),size=4.5)+
   scale_y_continuous(expand = c(0, 0),limits = c(0, 1.1))+
@@ -1012,38 +1119,43 @@ ggplot(df.summary, aes(species, germination)) +
   ylab("Germination (proportion)")+
   theme_gray(base_size=30)+theme(legend.position="none")
 
-##
-###POLLEN LIMITATION##
-##
 
+##########################
+#######POLLEN LIMITATION##
+##########################
+
+dir()
 pol_lim<-read.table("11Eriosyce_PL.csv", header=T, sep=";",dec=".")
-pl_alb<-pol_lim[c(17:27),c(7:8)]
+
+pl_alb<-pol_lim[c(17:27),c(7:8)] 
 pl_chi<-pol_lim[c(1:16),c(7:8)]
 pl_lit<-pol_lim[c(48:67),c(7:8)]
 pl_mut<-pol_lim[c(28:47),c(7:8)]
 
-#PL, based on Larson & Barrett (2000)
+#Pollen Limitation, based on Larson & Barrett (2000) Biological Journal of the Linnean Society 69(4):503 - 520
 fc_seeds <- function(data,i){
   d <- data[i,]
   Po_s<-sum(na.omit(d[,1]))/length(na.omit(which(d[,1]>0)))
   Pc <-sum(na.omit(d[,2]))/length(na.omit(which(d[,2]>0)))        
   return(1-(Po_s/Pc))
-} #PL in seeds
+} #PL for seeds
 
-#Indice de LArson y Barret (2000)
+#Indice de Larson y Barret (2000)
 # PL = 1 - (Po/Pc)
 #Po fruit set/seed number in the open flowers
 #Pc fruit set7seed number in the closed
-fc_seeds(pl_alb) #
+fc_seeds(pl_alb) 
 
 set.seed(626)
-#library(boot)
-bootcorr<-boot(pl_alb, fc_seeds, R=999) # 
+library(boot)
+bootcorr<-boot(pl_mut, fc_seeds, R=100000) # need change each taxa: pl_chi, pl_alb, pl_lit, pl_mut  
 boot.ci(bootcorr,conf=0.95,type="norm") 
 
-# Test the distribution (PL)
+# Test the distribution against a mu greater than zero (PL)
 t.test(bootcorr$t[,1],alternative="greater", mu=0, paired=F,conf.level=0.95)
-#Descriptive statistics
+
+
+#Descrpitive statistics
 pol_lim2<-pol_lim[,c(9:11)]
 df.pl<-pol_lim2 %>%
   group_by(taxa,treatemt) %>%
@@ -1052,6 +1164,7 @@ df.pl<-pol_lim2 %>%
     N_seeds = mean(seeds)
   )
 df.pl
+
 
 ggplot(aes(y = seeds, x = treatemt,fill=treatemt), data = pol_lim2) + geom_boxplot()+
   facet_grid(.~ taxa)
